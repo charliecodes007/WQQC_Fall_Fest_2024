@@ -1,6 +1,7 @@
 import numpy as np
 import qiskit
 from qiskit_experiments.library import T1
+from qiskit_ibm_runtime.fake_provider import FakeAthensV2
 from qiskit_ibm_runtime.fake_provider import FakeBrisbane
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
@@ -9,6 +10,8 @@ import warnings
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_experiments.library.characterization.t2hahn import T2Hahn
 import matplotlib.pyplot as plt
+import boto3
+from datetime import datetime
 
 #get rid of annoying warning over nothing!
 warnings.filterwarnings("ignore", message="Options .* have no effect in local testing mode.")
@@ -69,7 +72,7 @@ def T1Test(numQubits, liveBackend=False, backend=None, customT1=False, customT1D
 
 def T2Test(numQubits, liveBackend=False, backend=None, delayStart=0, delayEnd=50, delaySpread=100):
     if liveBackend is False:
-        backendProvider = FakeBrisbane()
+        backendProvider = FakeAthensV2()
         #build noise model
         noise_model = NoiseModel.from_backend(
             backendProvider, gate_error=False, readout_error=False, thermal_relaxation=True)
@@ -105,39 +108,44 @@ def T2Test(numQubits, liveBackend=False, backend=None, delayStart=0, delayEnd=50
     return experimentArray
 
 
-# Parameters for the T2Test
-numQubits = 127  # Number of qubits to test
-liveBackend = False  # Set to True if using a live backend
-backend = None  # Specify your backend if using a live backend
-delayStart = 0  # Start delay
-delayEnd = 50  # End delay
-delaySpread = 100  # Number of delay points
+def addT1ToTable(tableName, QubitNum, T1Value, T1Std):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(tableName)
 
-# Run the T2 Test
-experimentArray = T2Test(numQubits, liveBackend, backend, delayStart, delayEnd, delaySpread)
+    timestamp = datetime.now()
 
-# Prepare data for plotting
-t2_values = []
-std_devs = []
-qubit_indices = []
+    table.put_item(
+        Item={
+            'QubitNumber': QubitNum,
+            'Timestamp': timestamp,
+            'T2Value': T1Value,
+            'StandardDeviation': T1Std
+        }
+    )
 
-for i, result in enumerate(experimentArray):
-    if result[0] is not None:  # Check if the nominal value is not None
-        t2_values.append(result[0])
-        std_devs.append(result[1])
-        qubit_indices.append(i)
 
-# Convert lists to numpy arrays for better handling
-t2_values = np.array(t2_values)
-std_devs = np.array(std_devs)
+def addT2ToTable(tableName, QubitNum, T2Value, T2Std):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(tableName)
 
-# Plotting
-plt.figure(figsize=(10, 6))
-plt.bar(qubit_indices, t2_values, yerr=std_devs, capsize=5, color='lightblue', alpha=0.7, label='T2 Values')
-plt.xticks(qubit_indices)  # Set x-ticks to be the qubit indices
-plt.title('T2 Hahn Echo Experiment Results')
-plt.xlabel('Qubit Index')
-plt.ylabel('T2 Time (s)')
-plt.grid(axis='y', linestyle='--')
-plt.legend()
-plt.show()
+    timestamp = datetime.now()
+
+    table.put_item(
+        Item={
+            'QubitNumber': QubitNum,
+            'Timestamp': timestamp,
+            'T2Value': T2Value,
+            'StandardDeviation': T2Std
+        }
+    )
+
+
+
+
+
+
+
+
+
+
+
